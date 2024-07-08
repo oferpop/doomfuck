@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library - Manage Loans</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        nav { background-color: #333; overflow: hidden; }
+        nav ul { list-style-type: none; margin: 0; padding: 0; }
+        nav ul li { float: left; }
+        nav ul li a { display: block; color: white; text-align: center; padding: 14px 16px; text-decoration: none; }
+        nav ul li a:hover { background-color: #111; }
+        .container { width: 80%; margin: 0 auto; padding-top: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; }
+        input, button { width: 100%; padding: 10px; }
+        button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        table, th, td { border: 1px solid black; }
+        th, td { padding: 15px; text-align: left; }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0, 0, 0);
+            background-color: rgba(0, 0, 0, 0.4);
+            padding-top: 60px;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="books.html">Books</a></li>
+            <li><a href="customers.html">Customers</a></li>
+            <li><a href="loans.html">Loans</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <h1>Manage Loans</h1>
+        <button onclick="openAddLoanModal()">Add a New Loan</button>
+        <button onclick="openGetLoansModal()">Get Loans</button>
+    </div>
+
+    <!-- Add Loan Modal -->
+    <div id="addLoanModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAddLoanModal()">&times;</span>
+            <h2>Add a New Loan</h2>
+            <form id="add-loan-form">
+                <div class="form-group">
+                    <label for="cust_id">Customer ID:</label>
+                    <input type="number" id="cust_id" name="cust_id" required>
+                </div>
+                <div class="form-group">
+                    <label for="book_id">Book ID:</label>
+                    <input type="number" id="book_id" name="book_id" required>
+                </div>
+                <button type="submit">Add Loan</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Get Loans Modal -->
+    <div id="getLoansModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeGetLoansModal()">&times;</span>
+            <h2>Loans List</h2>
+            <table id="loans-table">
+                <thead>
+                    <tr>
+                        <th>Customer ID</th>
+                        <th>Customer Name</th>
+                        <th>Customer Email</th>
+                        <th>Book Name</th>
+                        <th>Book ID</th>
+                        <th>Loan Date</th>
+                        <th>Return Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('add-loan-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const loanData = {
+                cust_id: document.getElementById('cust_id').value,
+                book_id: document.getElementById('book_id').value
+            };
+
+            const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+
+            axios.post('http://127.0.0.1:5000/add_loan', loanData, {
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken
+                }
+            })
+            .then(function(response) {
+                alert('Loan added successfully!');
+                closeAddLoanModal(); // Close modal after adding loan
+                getLoans(); // Refresh loans list
+            })
+            .catch(function(error) {
+                alert('Error adding loan: ' + (error.response ? error.response.data.error : error.message));
+            });
+        });
+
+        function getLoans() {
+            const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+
+            axios.get('http://127.0.0.1:5000/loans', {
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken
+                }
+            })
+            .then(function(response) {
+                const loansTable = document.getElementById('loans-table').getElementsByTagName('tbody')[0];
+                loansTable.innerHTML = '';
+                response.data.forEach(function(loan) {
+                    const row = loansTable.insertRow();
+                    row.insertCell(0).innerText = loan.customer_id;
+                    row.insertCell(1).innerText = loan.customer_name;
+                    row.insertCell(2).innerText = loan.customer_email;
+                    row.insertCell(3).innerText = loan.book_name;
+                    row.insertCell(4).innerText = loan.book_id;
+                    row.insertCell(5).innerText = loan.loan_date;
+                    row.insertCell(6).innerText = loan.return_date;
+                    row.insertCell(7).innerHTML = `
+                        <button onclick="returnBook(${loan.book_id})">Return</button>
+                    `;
+                    if (new Date(loan.return_date) > new Date()) {
+                        row.style.backgroundColor = 'lightcoral';
+                        row.cells[7].innerHTML += `<span> (Unavailable until ${loan.return_date})</span>`;
+                    }
+                });
+            })
+            .catch(function(error) {
+                alert('Error fetching loans: ' + error.message);
+            });
+        }
+
+        function returnBook(bookId) {
+            const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+
+            axios.put(`http://127.0.0.1:5000/loans/${bookId}/return`, {}, {
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken
+                }
+            })
+            .then(response => {
+                alert('Book returned successfully');
+                getLoans(); // Refresh loans list without closing the modal
+            })
+            .catch(error => {
+                alert('Error returning book: ' + (error.response ? error.response.data.error : error.message));
+            });
+        }
+
+        function openAddLoanModal() {
+            document.getElementById('addLoanModal').style.display = 'block';
+        }
+
+        function closeAddLoanModal() {
+            document.getElementById('addLoanModal').style.display = 'none';
+        }
+
+        function openGetLoansModal() {
+            document.getElementById('getLoansModal').style.display = 'block';
+            getLoans(); // Fetch loans when opening the modal
+        }
+
+        function closeGetLoansModal() {
+            document.getElementById('getLoansModal').style.display = 'none';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+            if (!accessToken) {
+                alert('Please login as admin to manage loans.');
+                window.location.href = 'index.html';
+            } else {
+                axios.get('http://127.0.0.1:5000/protected', {
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken
+                    }
+                })
+                .then(function(response) {
+                    // User is authorized
+                })
+                .catch(function(error) {
+                    alert('Access denied. Admins only.');
+                    window.location.href = 'index.html';
+                });
+            }
+        });
+    </script>
+</body>
+</html>
